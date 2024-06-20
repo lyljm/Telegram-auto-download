@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 每隔30秒，log4j2会刷新一次配置。 -->
+<Configuration status="INFO" monitorInterval="30">
+
+    <Properties>
+        <!-- 应用需要修改为合适的log路径 -->
+        <Property name="baseLogDir">logs</Property>
+        <Property name="pattern">%d{yyyy-MM-ddHH:mm:ssSSS}|%t|%-5p|%X{requestId}|%X{LogID} # %m%n</Property>
+        <Property name="packagePath">org.downloader</Property>
+    </Properties>
+
+    <Appenders>
+        <!-- 系统日志，可以作为root logger的appender，供打印一些中间件的日志 -->
+        <RollingRandomAccessFile name="SYS_APPENDER" immediateFlush="true" fileName="${baseLogDir}/server.log" filePattern="${baseLogDir}/server.log.%d{yyyyMMddHH}.%i.gz">
+            <PatternLayout>
+                <Pattern>${pattern}</Pattern>
+            </PatternLayout>
+            <Policies>
+                <SizeBasedTriggeringPolicy size="10MB" />
+                <!-- 设置在每小时的第45分钟滚动日志-->
+                <CronTriggeringPolicy schedule="0 45 * * * ?" />
+            </Policies>
+            <Filters>
+                <ThresholdFilter level="INFO" onMatch="ACCEPT" onMismatch="DENY" />
+            </Filters>
+            <!-- max=20标识一小时内最多产生6个日志文件；若不配置，默认保留7个滚动日志文件 -->
+            <DefaultRolloverStrategy max="6">
+                <!-- 对于指定的路径下的指定后缀的文件，只保留1天的日志文件，则磁盘上最多会有24小时*6个日志文件 -->
+                <Delete basePath="${baseLogDir}" maxDepth="1">
+                    <IfFileName glob="*.zip" />
+                    <IfLastModified age="1d" />
+                </Delete>
+            </DefaultRolloverStrategy>
+        </RollingRandomAccessFile>
+        <!-- 应用info日志 -->
+        <RollingRandomAccessFile name="APP_APPENDER" immediateFlush="true" fileName="${baseLogDir}/app.log" filePattern="${baseLogDir}/app.log.%d{yyyyMMddHH}.%i.gz">
+            <PatternLayout>
+                <Pattern>${pattern}</Pattern>
+            </PatternLayout>
+            <Policies>
+                <SizeBasedTriggeringPolicy size="10MB" />
+                <CronTriggeringPolicy schedule="0 45 * * * ?" />
+            </Policies>
+            <Filters>
+                <!-- 打印INFO级别以上的日志 -->
+                <ThresholdFilter level="INFO" onMatch="ACCEPT" onMismatch="DENY" />
+            </Filters>
+            <DefaultRolloverStrategy max="20">
+                <!-- 磁盘上最多会有3天*24小时*20个日志文件 -->
+                <Delete basePath="${baseLogDir}" maxDepth="1">
+                    <IfFileName glob="*.zip" />
+                    <IfLastModified age="3d" />
+                </Delete>
+            </DefaultRolloverStrategy>
+        </RollingRandomAccessFile>
+        <!-- 应用错误日志 -->
+        <RollingRandomAccessFile name="APPERROR_APPENDER" immediateFlush="true" fileName="${baseLogDir}/apperror.log"
+                                 filePattern="${baseLogDir}/apperror.log.%d{yyyyMMddHH}.%i.gz">
+            <PatternLayout>
+                <Pattern>${pattern}</Pattern>
+            </PatternLayout>
+            <Policies>
+                <SizeBasedTriggeringPolicy size="10MB" />
+                <CronTriggeringPolicy schedule="0 45 * * * ?" />
+            </Policies>
+            <Filters>
+                <ThresholdFilter level="WARN" onMatch="ACCEPT" onMismatch="DENY" />
+            </Filters>
+
+            <DefaultRolloverStrategy max="10">
+                <!-- 磁盘上最多会有3*24小时*10个日志文件 -->
+                <Delete basePath="${baseLogDir}" maxDepth="1">
+                    <IfFileName glob="*.zip" />
+                    <IfLastModified age="3d" />
+                </Delete>
+            </DefaultRolloverStrategy>
+        </RollingRandomAccessFile>
+    </Appenders>
+    <Loggers>
+        <!-- 应用包之外的日志写入server.log, 如第三方jar包，中间件等，级别在warn之上 -->
+        <Root level="INFO" includeLocation="false">
+            <AppenderRef ref="SYS_APPENDER" />
+        </Root>
+        <!-- additivity建议设置为false以避免在root logger中重复打印 -->
+        <!-- includeLocation建议设置为false，关闭位置打印 -->
+        <Logger name="${packagePath}" level="INFO" includeLocation="false" additivity="false">
+            <AppenderRef ref="APP_APPENDER" />
+            <AppenderRef ref="APPERROR_APPENDER" />
+        </Logger>
+    </Loggers>
+</Configuration>
