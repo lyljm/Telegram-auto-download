@@ -1,51 +1,36 @@
 package org.downloader.utils;
 
-import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.io.FileUtil;
+import org.downloader.Bean.Channel;
+import org.downloader.Bean.FileClass;
+import org.downloader.Bean.MessageGroup;
 
 import java.io.File;
-import java.io.IOException;
-import java.nio.file.FileAlreadyExistsException;
-import java.nio.file.Files;
-import java.util.Date;
+import java.util.List;
+import java.util.Set;
 
 public class FileDispatcher {
-    public static void walkFile(File file) {
-        File[] fs = file.listFiles();
-        for (File f : fs) {
-            if (f.isDirectory())
-//                walkFile(f);
-                continue;
-            if (f.isFile()) {
-                String oldName = FileUtil.getName(f);
-                int i = 0;
-                for (; i < oldName.length(); i++) {
-                    char ch = oldName.charAt(i);
-                    if (!Character.isDigit(ch))
-                        break;
-                }
-                String prefix = oldName.substring(0, i);
-                if (prefix.isEmpty()) continue;
-                String time = DateUtil.format(new Date(Long.parseLong(prefix) * 1000), Config.dataFormat);
-                String newPath = f.getParent() + "\\" + time + "\\" + oldName;
-                File newFile = new File(newPath);
-                try {
-                    FileUtil.mkParentDirs(newFile);
-                    Files.move(f.toPath(), newFile.toPath());
-                } catch (FileAlreadyExistsException e) {
-                    try {
-                        if (newFile.delete()) {
-                            Files.move(f.toPath(), newFile.toPath());
-                        }
-                    } catch (IOException ex) {
-                        ex.printStackTrace();
-                        System.exit(1);
-                    }
-                } catch (IOException e) {
-                    e.printStackTrace();
-                    System.exit(1);
+
+    public static void dispathFile(String path, Channel channel, MessageGroup messageGroup) {
+        // TODO: 2024/6/22 添加匹配格式 添加按关键词分类
+        FileUtil.walkFiles(new File(path), file -> {
+            if (FileUtil.isDirectory(file)) return;
+            List<FileClass> fileClassify = channel.getFileClassify();
+            int i = 0;
+            for (; i < fileClassify.size() - 1; i++) {
+                FileClass fileClass = fileClassify.get(i);
+                Set<String> fileSuffix = fileClass.getFileSuffix();
+                if (fileSuffix.contains(FileUtil.getSuffix(file))) {
+                    if (!FileUtil.exist(fileClass.getPath()))
+                        FileUtil.mkdir(fileClass.getPath());
+                    FileUtil.move(file, new File(fileClass.getPath() + file.getName()), true);
+                    return;
                 }
             }
-        }
+            FileClass fileClass = fileClassify.get(i);
+            if (!FileUtil.exist(fileClass.getPath()))
+                FileUtil.mkdir(fileClass.getPath());
+            FileUtil.move(file, new File(fileClass.getPath() + file.getName()), true);
+        });
     }
 }

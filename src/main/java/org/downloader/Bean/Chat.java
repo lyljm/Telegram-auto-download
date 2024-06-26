@@ -1,19 +1,21 @@
 package org.downloader.Bean;
 
+
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * 消息
- */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class Message {
-    Long id;
+public class Chat {
+    /**
+     * chat Id
+     */
+    String chatId;
 
-    String type;
-
-    String file;
+    /**
+     * 当前序号
+     */
+    long curIndex;
 }

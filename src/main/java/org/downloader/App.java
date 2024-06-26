@@ -1,47 +1,72 @@
 package org.downloader;
 
+import cn.hutool.core.io.FileUtil;
+import cn.hutool.json.JSON;
 import cn.hutool.json.JSONUtil;
 import lombok.extern.slf4j.Slf4j;
-import org.downloader.Bean.Group;
-import org.downloader.Bean.Message;
-import org.downloader.utils.Config;
+import org.downloader.Bean.*;
+import org.downloader.config.Config;
 import org.downloader.utils.Executer;
-import org.downloader.utils.Rwfile;
 import org.downloader.utils.FileDispatcher;
 
 import java.io.File;
-import java.util.ArrayList;
+import java.nio.charset.Charset;
+import java.util.List;
+import java.util.Map;
 
 
 @Slf4j
 public class App {
     public static void main(String[] args) throws InterruptedException {
-        System.out.println("APP start download");
+        System.out.println("App start download");
+        //初始化检查
+
+        //初始化
+        Map<String, FileClass> fileClassMap = Config.fileClassMap;
+        List<Channel> channels = Config.channels;
+        for (Channel channel : channels) {
+            List<String> fileClassifyName = channel.getFileClassifyName();
+            for (String className : fileClassifyName) {
+                FileClass fileClass = fileClassMap.get(className);
+                if (null == fileClass)
+                    throw new RuntimeException("文件配置错误： ChannelId为" + channel.getChannelId() + "的channel中fileClassifyName[" + className + "]不存在");
+                channel.getFileClassify().add(fileClass);
+            }
+        }
+
+        //Channel配置完成
         while (true) {
-            String serialString = Rwfile.readAll(Config.serialFile);
-            long serial = Long.parseLong(serialString.length() > 0 ? serialString : "0");
-            Executer.exeCmd("cmd /c tdl chat export -c "+Config.url +" -T id -i " + (serial + 1) + "," + (serial + 1 + Config.pop) + " -o " + Config.jsonFile, true);
-            String json = Rwfile.readAll(Config.jsonFile);
-            Group group = JSONUtil.toBean(json, Group.class);
-            long maxSerial = serial + Config.pop;
-            ArrayList<Message> messages = new ArrayList<>(group.getMessages().length);
-            for (Message mes : group.getMessages()) {
-                if (mes.getId() > serial && mes.getId() <= maxSerial) {
-                    messages.add(mes);
+            boolean downloaded=false;
+            for (Channel channel : channels) {
+                List<Chat> chats = channel.getChats();
+                for (Chat chat : chats) {
+                    String parentPath=Config.tmpPath+"/"+chat.getChatId()+"/";
+                    String tdlPath = parentPath+"tdl/tdl.json";
+                    FileUtil.mkParentDirs(tdlPath);
+//                    导出tdl json
+                    Executer.exeCmd("cmd /c tdl chat export -c " + chat.getChatId() + " -T id -i "
+                            + chat.getCurIndex() + "," + (chat.getCurIndex()+channel.getPop()-1) + " -o " + tdlPath, true);
+                    JSON json = JSONUtil.readJSON(new File(tdlPath), Charset.defaultCharset());
+                    MessageGroup messageGroup = JSONUtil.toBean(json, MessageGroup.class, false);
+                    Message[] messages = messageGroup.getMessages();
+                    if(messages!=null&&messages.length>0){
+                        downloaded=true;
+//                        下载
+                        Executer.exeCmd("cmd /c tdl dl --skip-same -f "+tdlPath+" -d "+parentPath+" --template \"{{ .MessageDate }}_{{ .MessageID }}_{{ replace .FileName `/` `_` `\\\\` `_` `:` `_` `*` `_` `?` `_` `<` `_` `>` `_` `|` `_` ` ` `_`  }}\" --continue", true);
+//                        文件分类
+                        FileDispatcher.dispathFile(parentPath,channel,messageGroup);
+                        chat.setCurIndex(chat.getCurIndex()+channel.getPop());
+                        Config.writeConfig();
+                    }
                 }
             }
-            group.setMessages(messages.toArray(new Message[0]));
-            int pop = group.getMessages().length;
-            if (!messages.isEmpty()) {
-                Rwfile.write(Config.jsonFile, JSONUtil.toJsonStr(JSONUtil.parse(group)));
-                Executer.exeCmd(Config.downCmd, true);
-                log.info("currentSerial: " + serial + "  pop: " + pop + "  newMaxSerial: " + maxSerial);
-                FileDispatcher.walkFile(new File(Config.downFilePath));
-                Rwfile.write(Config.serialFile, (serial + pop));
+            if(!downloaded){
+                Thread.yield();
+                Thread.sleep(5000);
             }
-            System.out.print("\rcurrentSerial: " + serial + "  pop: " + pop + "  newMaxSerial: " + (maxSerial + 1));
-            Thread.sleep(5000);
         }
     }
+
+
 
 }
