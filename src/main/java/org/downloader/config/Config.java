@@ -15,16 +15,16 @@ import java.util.*;
 
 public class Config {
     public static List<Channel> channels=new LinkedList<>();
-    public static Map<String,FileClass> fileClassMap =new HashMap();
+    public static Map<String,FileClass> fileClassMap =new HashMap<>();
     private final static String parentPath = System.getProperty("user.dir");
     private final static String configPath = parentPath + "/config/config.json";
 
-    public static String tmpPath=parentPath+"/tmpDownloadDir";
+    public final static String tmpPath=parentPath+"/TmpDownDir";
 
 
-//    static {
-//        readConfig();
-//    }
+    static {
+        readConfig();
+    }
 
     public static void writeConfig(){
         ConfigProperties configProperties = new ConfigProperties();
@@ -33,10 +33,6 @@ public class Config {
         FileWriter fileWriter = FileWriter.create(new File(configPath),StandardCharsets.UTF_8);
         String jsonPrettyStr = JSONUtil.toJsonPrettyStr(configProperties);
         fileWriter.write(jsonPrettyStr);
-    }
-
-    static {
-        readConfig();
     }
 
     public static void writeConfig(List<Channel> channels,Map<String,FileClass>fileClassMap){

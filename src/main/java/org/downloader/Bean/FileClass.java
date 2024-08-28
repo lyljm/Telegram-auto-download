@@ -1,5 +1,7 @@
 package org.downloader.Bean;
 
+
+
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
